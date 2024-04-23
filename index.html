@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
         integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
     <link href="assets/css/sticky-menu.css" rel="stylesheet">
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
     <style>
         .member .card {
             height: 100%;
@@ -24,10 +25,13 @@
 <body id="page-top" data-spy="scroll" data-target=".navbar-fixed-top">
     <div class="container mb-5">
         <div class="row">
-            <div class="col-lg-3 col-md-3 col-sm-4 offset-sm-4 mt-5">
-                <img src="assets/images/favicon.jpg" class="img-fluid" alt="RSS 2024">
+            <div class="col-lg-3 col-md-3 col-sm-4 mt-5 d-flex">
+                <lottie-player src="assets/lottie/person.json" background="transparent" speed="1"
+                    style="width: 150px; height: 150px" direction="1" mode="normal" loop autoplay></lottie-player>
+                <lottie-player src="assets/lottie/robot.json" background="transparent" speed="1"
+                    style="width: 175px; height: 175px" direction="1" mode="normal" loop autoplay></lottie-player>
             </div>
-            <div class="col-12 col-xs-12 col-sm-12 col-md-9 col-lg-9">
+            <div class="col-12 col-xs-12 col-sm-8 col-md-9 col-lg-9">
                 <div class="align-middle align-text-middle mt-5">
                     <h1 class="mt-1">Supervised Policy Learning for Real Robots</h1>
                     <span class="badge badge-pill badge-dark">Supervised Learning</span>
