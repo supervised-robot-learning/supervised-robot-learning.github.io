@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maze Ball Physics Simulation</title>
+    <style>
+        canvas {
+            background-color: #eee;
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+
+<body>
+    <h1 hidden>Maze Ball Physics Simulation</h1>
+    <p>Use up/down/left/right arrow keys to control the ball.</p>
+    <!-- Checkbox to enable mouse -->
+    <label for="mouseControl" hidden>Enable mouse control</label>
+    <input type="checkbox" id="mouseControl" hidden>
+    <p hidden id="mouseControlText">Click and drag the ball to control its velocity.</p>
+    <canvas id="simulationCanvas" width="800" height="800"></canvas>
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getFirestore, serverTimestamp, collection, addDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAK3snfH25WOdjfa4fPU2eYdHeW7aYZ2tA",
+            authDomain: "multimodal-maze.firebaseapp.com",
+            projectId: "multimodal-maze",
+            storageBucket: "multimodal-maze.appspot.com",
+            messagingSenderId: "255424607762",
+            appId: "1:255424607762:web:04a3e31bd49d6f32b0cacb"
+        };
+
+        // Initialize firebase and firestore
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        async function logTrajectory(newTrail, maze) {
+            try {
+                const data = {
+                    trail: newTrail,
+                    timestamp: serverTimestamp(),
+                    mazeHash: JSON.stringify(maze),
+                };
+                // Add the data to db
+                const docRef = await addDoc(collection(db, 'trajectories'), data);
+                console.log('Trajectory logged successfully with ID: ', docRef.id);
+            } catch (error) {
+                console.error('Error logging trajectory: ', error);
+            }
+        }
+        window.logTrajectory = logTrajectory;
+    </script>
+    <script>
+        // Show and hide the mouse control text based on the checkbox
+        const mouseControl = document.getElementById('mouseControl');
+        const mouseControlText = document.getElementById('mouseControlText');
+        mouseControl.addEventListener('change', () => {
+            mouseControlText.hidden = !mouseControl.checked;
+        });
+        const canvas = document.getElementById('simulationCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const maze = [
+            [1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 0, 0, 1, 1, 0, 0, 1],
+            [1, 0, 0, 1, 0, 0, 0, 1],
+            [1, 1, 0, 0, 0, 1, 1, 1],
+            [1, 0, 0, 1, 0, 0, 0, 1],
+            [1, 0, 1, 0, 0, 1, 0, 1],
+            [1, 0, 0, 0, 1, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1],
+        ];
+
+        const cellSize = canvas.width / maze.length;
+
+        const ball = {
+            x: cellSize * 1.5,
+            y: cellSize * 1.5,
+            radius: cellSize / 6,
+            color: 'blue',
+            vx: 0,
+            vy: 0,
+            mass: 1,
+            damping: 0.99
+        };
+
+        const keys = [
+            { x: cellSize * 1.5, y: cellSize * 6.5 },
+            { x: cellSize * 6.5, y: cellSize * 1.5 },
+            { x: cellSize * 5.5, y: cellSize * 6.5 },
+        ];
+
+        const forces = {
+            left: 0,
+            right: 0,
+            up: 0,
+            down: 0
+        };
+
+        const forceMagnitude = 0.1;
+        const trail = [];
+        const newTrail = [];
+        var trailColor = getRandomPastelColor();
+
+        function resetBall() {
+            isDragging = false;
+            ball.x = cellSize * 1.5;
+            ball.y = cellSize * 1.5;
+            // Add random offset to ball positions
+            ball.x += (Math.random() - 0.5) * cellSize / 2;
+            ball.y += (Math.random() - 0.5) * cellSize / 2;
+
+            // Set ball velocity between -0.1 and 0.1 randomly.
+            ball.vx = (Math.random() - 0.5) * 0.2;
+            ball.vy = (Math.random() - 0.5) * 0.2;
+            window.logTrajectory(newTrail, maze);
+            newTrail.length = 0; // Clear the trail
+            trail.push({ x: ball.x, y: ball.y, connect: false, color: trailColor });
+            trailColor = getRandomPastelColor();
+        }
+
+        function applyForces() {
+            ball.vx += (forces.right - forces.left) * forceMagnitude / ball.mass;
+            ball.vy += (forces.down - forces.up) * forceMagnitude / ball.mass;
+        }
+
+        function updatePhysics() {
+            applyForces();
+
+            ball.vx *= ball.damping;
+            ball.vy *= ball.damping;
+
+            let nextX = ball.x + ball.vx;
+            let nextY = ball.y + ball.vy;
+
+            const col = Math.floor(nextX / cellSize);
+            const row = Math.floor(nextY / cellSize);
+
+            if (maze[row][col] === 1) {
+                if (maze[Math.floor(ball.y / cellSize)][col] === 1) {
+                    ball.vx *= -1; // Bounce horizontally
+                }
+                if (maze[row][Math.floor(ball.x / cellSize)] === 1) {
+                    ball.vy *= -1; // Bounce vertically
+                }
+            } else {
+                ball.x = nextX;
+                ball.y = nextY;
+            }
+
+            // Check if ball reached any key
+            keys.forEach((key) => {
+                const dist = Math.hypot(ball.x - key.x, ball.y - key.y);
+                if (dist < 1.414 * ball.radius) {
+                    resetBall();
+                }
+            });
+
+            // Add current position to trail
+            trail.push({ x: ball.x, y: ball.y, connect: true, color: trailColor });
+            newTrail.push({ x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, fx: forces.right - forces.left, fy: forces.down - forces.up });
+        }
+
+        function drawMaze() {
+            for (let row = 0; row < maze.length; row++) {
+                for (let col = 0; col < maze[row].length; col++) {
+                    if (maze[row][col] === 1) {
+                        ctx.fillStyle = 'black';
+                    } else {
+                        ctx.fillStyle = 'white';
+                    }
+                    ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        function drawKeys() {
+            keys.forEach((key) => {
+                ctx.beginPath();
+                ctx.arc(key.x, key.y, ball.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'red';
+                ctx.fill();
+                ctx.closePath();
+            });
+        }
+
+        function getRandomPastelColor() {
+            // Generate a random hue between 0 and 360
+            const hue = Math.floor(Math.random() * 360);
+            // Set the saturation and lightness to values that produce pastel colors
+            const saturation = 70 + Math.random() * 10; // 70-80%
+            const lightness = 75 + Math.random() * 10; // 70-80%
+
+            // Return the HSL color string
+            return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+        }
+
+        function drawTrail() {
+            ctx.strokeStyle = trail[0].color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let i = 0; i < trail.length - 1; i++) {
+                ctx.moveTo(trail[i].x, trail[i].y);
+                if (trail[i + 1].connect) {
+                    ctx.lineTo(trail[i + 1].x, trail[i + 1].y);
+                }
+                else {
+                    ctx.stroke();
+                    ctx.closePath();
+                    ctx.strokeStyle = trail[i + 1].color;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                }
+            }
+            ctx.stroke();
+        }
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = ball.color;
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawMaze();
+            drawKeys();
+            drawTrail();
+            drawBall();
+        }
+
+        function loop() {
+            updatePhysics();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        document.addEventListener('keydown', (event) => {
+            switch (event.key) {
+                case 'ArrowLeft':
+                    forces.left = 1;
+                    break;
+                case 'ArrowRight':
+                    forces.right = 1;
+                    break;
+                case 'ArrowUp':
+                    forces.up = 1;
+                    break;
+                case 'ArrowDown':
+                    forces.down = 1;
+                    break;
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            switch (event.key) {
+                case 'ArrowLeft':
+                    forces.left = 0;
+                    break;
+                case 'ArrowRight':
+                    forces.right = 0;
+                    break;
+                case 'ArrowUp':
+                    forces.up = 0;
+                    break;
+                case 'ArrowDown':
+                    forces.down = 0;
+                    break;
+            }
+        });
+
+        const MULTIPLIER = 1;
+        const MAX_SPEED = 10;
+
+        function clip(value, min, max) {
+            return Math.min(Math.max(value, min), max);
+        }
+
+        // Only allow mouse events if the box is checked.
+        canvas.addEventListener('mousedown', (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+
+            const dist = Math.hypot(mouseX - ball.x, mouseY - ball.y);
+            if (dist < ball.radius) {
+                if (document.getElementById('mouseControl').checked) {
+                    isDragging = true;
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (event) => {
+            if (isDragging) {
+                const rect = canvas.getBoundingClientRect();
+                ball.vx = MULTIPLIER * (event.clientX - rect.left - ball.x);
+                ball.vx = clip(ball.vx, -MAX_SPEED, MAX_SPEED);
+                ball.vy = MULTIPLIER * (event.clientY - rect.top - ball.y);
+                ball.vy = clip(ball.vy, -MAX_SPEED, MAX_SPEED);
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        loop();
+    </script>
+</body>
+
+</html>
